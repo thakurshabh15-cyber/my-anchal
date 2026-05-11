@@ -403,18 +403,19 @@ class GeminiClient:
 
     # ── blocking call (run inside executor so the event loop stays free) ──────
     def _call(self, system: str, history: list[dict], user_msg: str) -> str:
-        # Build contents array — role must be "user" or "model"
-        contents: list[dict] = []
-
-        # Seed the conversation so Anchal acknowledges her identity
-        contents.append({
-            "role":  "user",
-            "parts": [{"text": "Kaun hai tu?"}],
-        })
-        contents.append({
-            "role":  "model",
-            "parts": [{"text": "Samajh gayi. Main Anchal hoon. Shuru karte hain."}],
-        })
+        # Build contents array — role must be "user" or "model".
+        # v1 REST API does not support system_instruction, so we inject the
+        # system prompt as the very first user turn followed by a model ack.
+        contents: list[dict] = [
+            {
+                "role":  "user",
+                "parts": [{"text": system}],
+            },
+            {
+                "role":  "model",
+                "parts": [{"text": "Samajh gayi. Main Anchal hoon. Shuru karte hain."}],
+            },
+        ]
 
         for m in history:
             role = "model" if m["role"] == "assistant" else "user"
@@ -430,13 +431,8 @@ class GeminiClient:
         })
 
         payload = {
-            # system_instruction is the proper REST field — keeps system prompt
-            # cleanly separated from the conversation turns.
-            "system_instruction": {
-                "parts": [{"text": system}]
-            },
-            "contents":           contents,
-            "generationConfig":   self._gen_cfg,
+            "contents":         contents,
+            "generationConfig": self._gen_cfg,
         }
 
         resp = requests.post(
