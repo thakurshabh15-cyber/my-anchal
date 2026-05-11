@@ -584,10 +584,16 @@ async def _cli():
                     ts  = datetime.fromtimestamp(m["ts"]).strftime("%H:%M")
                     who = "Rishabh" if m["role"] == "user" else "Anchal"
                     print(f"  [{ts}] {who}: {m['content'][:120]}")
-                print()
+                print() 
             case "wipe":
                 brain.wipe(user_id)
                 print("Anchal: Sab bhool gayi. Fresh start. 🌱\n")
+            case cmd if "open" in cmd:
+                   if "whatsapp" in cmd:
+                   os.system("termux-open-url https://wa.me")
+                   elif "instagram" in cmd:
+                   os.system("am start -n com.instagram.android/com.instagram.main.MainActivity")
+                   continue
             case _:
                 result = await brain.respond(raw, user_id=user_id)
                 print(f"\nAnchal [{result['emotion']}]: {result['reply']}\n")
