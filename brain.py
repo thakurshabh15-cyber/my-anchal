@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import google.generativeai as genai
+import requests
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -376,38 +376,98 @@ class CodeEngine:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  GEMINI CLIENT
+#  GEMINI CLIENT  (pure requests — no google-generativeai SDK needed)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class GeminiClient:
-    def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        self._model = genai.GenerativeModel(
-            model_name=GEMINI_MODEL,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.93,
-                top_p=0.95,
-                top_k=50,
-                max_output_tokens=MAX_TOKENS,
-            )
-        )
+    """
+    Talks directly to the Gemini generateContent REST endpoint.
+    Zero dependency on google-generativeai / pydantic-core.
+    Works on Termux with only: pip install requests
+    """
 
-    async def generate(self, system: str, history: list[dict], user_msg: str) -> str:
-        contents = [
-            {"role": "user",  "parts": [system]},
-            {"role": "model", "parts": ["Samajh gayi. Main Anchal hoon. Shuru karte hain."]},
-        ]
+    _BASE = (
+        "https://generativelanguage.googleapis.com"
+        "/v1beta/models/{model}:generateContent?key={key}"
+    )
+
+    def __init__(self, api_key: str):
+        self._api_key = api_key
+        self._url     = self._BASE.format(model=GEMINI_MODEL, key=api_key)
+        self._gen_cfg = {
+            "temperature":     0.93,
+            "topP":            0.95,
+            "topK":            50,
+            "maxOutputTokens": MAX_TOKENS,
+        }
+
+    # ── blocking call (run inside executor so the event loop stays free) ──────
+    def _call(self, system: str, history: list[dict], user_msg: str) -> str:
+        # Build contents array — role must be "user" or "model"
+        contents: list[dict] = []
+
+        # Seed the conversation so Anchal acknowledges her identity
+        contents.append({
+            "role":  "user",
+            "parts": [{"text": "Kaun hai tu?"}],
+        })
+        contents.append({
+            "role":  "model",
+            "parts": [{"text": "Samajh gayi. Main Anchal hoon. Shuru karte hain."}],
+        })
+
         for m in history:
             role = "model" if m["role"] == "assistant" else "user"
-            contents.append({"role": role, "parts": [m["content"]]})
-        contents.append({"role": "user", "parts": [user_msg]})
+            contents.append({
+                "role":  role,
+                "parts": [{"text": m["content"]}],
+            })
 
+        # Final user message
+        contents.append({
+            "role":  "user",
+            "parts": [{"text": user_msg}],
+        })
+
+        payload = {
+            # system_instruction is the proper REST field — keeps system prompt
+            # cleanly separated from the conversation turns.
+            "system_instruction": {
+                "parts": [{"text": system}]
+            },
+            "contents":           contents,
+            "generationConfig":   self._gen_cfg,
+        }
+
+        resp = requests.post(
+            self._url,
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            timeout=60,
+        )
+
+        if resp.status_code != 200:
+            # Surface the API error message clearly
+            try:
+                err = resp.json().get("error", {}).get("message", resp.text)
+            except Exception:
+                err = resp.text
+            raise RuntimeError(f"Gemini API {resp.status_code}: {err}")
+
+        data = resp.json()
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except (KeyError, IndexError) as e:
+            raise RuntimeError(f"Unexpected Gemini response shape: {data}") from e
+
+    # ── async wrapper — offloads blocking HTTP to a thread ───────────────────
+    async def generate(self, system: str, history: list[dict], user_msg: str) -> str:
         loop = asyncio.get_event_loop()
         try:
             text = await loop.run_in_executor(
-                None, lambda: self._model.generate_content(contents).text
+                None, lambda: self._call(system, history, user_msg)
             )
-            return text.strip()
+            return text
         except Exception as e:
             return f"Arre yaar, Gemini ne gadbad ki — {e}"
 
