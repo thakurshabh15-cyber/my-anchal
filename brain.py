@@ -1,4 +1,3 @@
-```python
 """
 brain.py v2.2 — Anchal AI: UNRESTRICTED FIRE
 ==========================================
@@ -372,9 +371,7 @@ class CodeEngine:
 
     @staticmethod
     def extract_block(text: str) -> Optional[str]:
-        m = re.search(r"
-
-```
+        m = re.search(r"```(?:\w+)?\n(.*?)\n```", text, re.DOTALL)
         return m.group(1).strip() if m else None
 
 
@@ -589,11 +586,11 @@ async def _cli():
                 brain.wipe(user_id)
                 print("Anchal: Sab bhool gayi. Fresh start. 🌱\n")
             case cmd if "open" in cmd:
-                   if "whatsapp" in cmd:
-                   os.system("termux-open-url https://wa.me")
-                   elif "instagram" in cmd:
-                   os.system("am start -n com.instagram.android/com.instagram.main.MainActivity")
-                   continue
+                if "whatsapp" in cmd:
+                    os.system("termux-open-url https://wa.me")
+                elif "instagram" in cmd:
+                    os.system("am start -n com.instagram.android/com.instagram.main.MainActivity")
+                continue
             case _:
                 result = await brain.respond(raw, user_id=user_id)
                 print(f"\nAnchal [{result['emotion']}]: {result['reply']}\n")
@@ -601,6 +598,3 @@ async def _cli():
 
 if __name__ == "__main__":
     asyncio.run(_cli())
-
-```
-
