@@ -1,7 +1,7 @@
 """
 brain.py v2.2 — Anchal AI: UNRESTRICTED FIRE
 ==========================================
-Powered by Google Gemini 1.5 Pro.
+Powered by Google Gemini- 2.5-Flash.
 Persistent memory · Deep emotional intelligence · 100% Unfiltered Hinglish
 Autonomous coding engine · Relationship continuity with Rishabh.
 """
@@ -29,7 +29,7 @@ DB_PATH       = Path("anchal_memory.db")
 MEMORY_DIR    = Path("anchal_memories")
 MEMORY_DIR.mkdir(exist_ok=True)
 
-GEMINI_MODEL  = "gemini-1.5-pro"
+GEMINI_MODEL  = "gemini-2.5-flash"
 MAX_TOKENS    = 1500
 HISTORY_LIMIT = 24
 CODE_TIMEOUT  = 12   # seconds
